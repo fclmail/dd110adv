@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DODO Flash Loan Arbitrage</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    body {
+      background-color: #002d00;
+      color: #39ff14;
+      font-family: monospace;
+      padding: 20px;
+    }
+    button {
+      background: #39ff14;
+      color: #002d00;
+      padding: 10px;
+      margin: 5px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    input, select {
+      padding: 8px;
+      margin: 5px;
+    }
+    .log {
+      white-space: pre-wrap;
+      border: 1px solid #39ff14;
+      padding: 10px;
+      margin-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .log div {
+      margin-bottom: 8px;
+    }
+    .log .green {
+      color: #00ff00;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h1>DODO Flash Loan Arbitrage</h1>
+
+<div>
+  <button id="connect">Connect Wallet</button>
+  <span id="wallet"></span>
+</div>
+
+<div>
+  <label>Buy Router 1:</label>
+  <input id="router1" value="0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff" size="45" />
+</div>
+<div>
+  <label>Buy Router 2:</label>
+  <input id="router2" value="0x1b02da8cb0d097eb8d57a175b88c7d8b47997506" size="45" />
+</div>
+
+<div>
+  <label>Min Profit (USDC):</label>
+  <input id="minProfit" type="number" value="0.01" step="0.0001" />
+</div>
+
+<div>
+  <label>Flash Loan Amount (USDC):</label>
+  <input id="loanAmount" type="number" value="1000" step="1" />
+</div>
+
+<div>
+  <label><input type="checkbox" id="autoTrade" checked /> Auto Trade If Profitable</label>
+</div>
+
+<div>
+  <button id="approve">Approve USDC</button>
+  <button id="start">Start</button>
+  <button id="stop">Stop</button>
+</div>
+
+<div class="log" id="log"></div>
+
+<script>
+const USDC = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
+const contractAddress = "0x2498Bc50732a655F0DbEa3319B1Cd7DDec884b6a";
+const abi = [ 
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "sender",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "baseAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "quoteAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "DPPFlashLoanCall",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token0",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "token1",
+				"type": "address"
+			},
+			{
+				"internalType": "uint8",
+				"name": "dexPath",
+				"type": "uint8"
+			}
+		],
+		"name": "initiateArbitrage",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			}
+		],
+		"name": "OwnableInvalidOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "OwnableUnauthorizedAccount",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_wei",
+				"type": "uint256"
+			}
+		],
+		"name": "setBribe",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "setFlashAmount",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_bps",
+				"type": "uint256"
+			}
+		],
+		"name": "setMinProfit",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_bps",
+				"type": "uint256"
+			}
+		],
+		"name": "setSlippage",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_treasury",
+				"type": "address"
+			}
+		],
+		"name": "setTreasury",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "withdrawMatic",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			}
+		],
+		"name": "withdrawToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "receive"
+	},
+	{
+		"inputs": [],
+		"name": "APE",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "apeSwap",
+		"outputs": [
+			{
+				"internalType": "contract IUniswapV2Router",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "bribe",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "buyPath",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "DODO_POOL",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "flashAmount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MATIC",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "minProfitBps",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "quickSwap",
+		"outputs": [
+			{
+				"internalType": "contract IUniswapV2Router",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "QUICKSWAP",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "sellPath",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "slippageBps",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "SUSHI",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "sushiSwap",
+		"outputs": [
+			{
+				"internalType": "contract IUniswapV2Router",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "treasury",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "USDC",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+];
+
+const tokens = {
+  AAVE: "0x8dff5e27ea6b7ac08ebfdf9eb090f32ee9a30fcf",
+  WBTC: "0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6",
+  UNI:  "0xb33eaad8d922b1083446dc23f610c2567fb5180f",
+  DAI:  "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063",
+  USDT: "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+  LINK: "0x53e0bca35ec356bd5dddfebbd1fc0fd03fabad39",
+  WETH: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"
+};
+
+let provider, signer, contract, intervalId;
+
+const log = (msg, highlight = false) => {
+  const timestamp = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.textContent = `[${timestamp}] ${msg}`;
+  if (highlight) div.classList.add("green");
+  document.getElementById("log").prepend(div);
+};
+
+document.getElementById("connect").onclick = async () => {
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  signer = provider.getSigner();
+  contract = new ethers.Contract(contractAddress, abi, signer);
+  document.getElementById("wallet").innerText = await signer.getAddress();
+  log("✅ Wallet connected");
+};
+
+document.getElementById("approve").onclick = async () => {
+  const usdc = new ethers.Contract(USDC, ["function approve(address,uint256) public returns (bool)"], signer);
+  await usdc.approve(contractAddress, ethers.constants.MaxUint256);
+  log("✅ USDC approved");
+};
+
+async function scanAllTokens() {
+  const router1Addr = document.getElementById("router1").value;
+  const router2Addr = document.getElementById("router2").value;
+  const minProfit = parseFloat(document.getElementById("minProfit").value);
+  const flashLoanAmount = ethers.utils.parseUnits(document.getElementById("loanAmount").value, 6);
+  const autoTrade = document.getElementById("autoTrade").checked;
+
+  const routerAbi = ["function getAmountsOut(uint256,address[]) view returns (uint256[])"];
+  const router1 = new ethers.Contract(router1Addr, routerAbi, provider);
+  const router2 = new ethers.Contract(router2Addr, routerAbi, provider);
+
+  for (const [name, tokenAddr] of Object.entries(tokens)) {
+    try {
+      const out1 = await router1.getAmountsOut(ethers.utils.parseUnits("1", 6), [USDC, tokenAddr]);
+      const out2 = await router2.getAmountsOut(ethers.utils.parseUnits("1", 6), [USDC, tokenAddr]);
+
+      const amt1 = parseFloat(ethers.utils.formatUnits(out1[1]));
+      const amt2 = parseFloat(ethers.utils.formatUnits(out2[1]));
+
+      const price1 = 1 / amt1;
+      const price2 = 1 / amt2;
+
+      const high = Math.max(price1, price2);
+      const low = Math.min(price1, price2);
+      const profit = high - low;
+
+      log(`${name} | R1 Buy: $${price1.toFixed(6)} | R2 Buy: $${price2.toFixed(6)} | Profit: $${profit.toFixed(6)}`, profit > minProfit);
+
+      if (profit > minProfit) {
+        log("🚀 Initiating Flash Loan Arbitrage...");
+        if (autoTrade) {
+          const tx = await contract.initiateArbitrage(USDC, tokenAddr, flashLoanAmount);
+          await tx.wait();
+          log(`✅ Auto Arbitrage Success for ${name}`, true);
+        } else {
+          const manualContract = new ethers.Contract(contractAddress, abi, signer);
+          const tx = await manualContract.initiateArbitrage(USDC, tokenAddr, flashLoanAmount); // opens wallet
+          await tx.wait();
+          log(`📝 Manual Arbitrage Confirmed for ${name}`, true);
+        }
+      }
+    } catch (err) {
+      log(`❌ ${name} scan failed: ${err.reason || err.message}`);
+    }
+  }
+}
+
+document.getElementById("start").onclick = () => {
+  clearInterval(intervalId);
+  log("🔁 Auto scanning all tokens every 10s...");
+  intervalId = setInterval(scanAllTokens, 10000);
+};
+
+document.getElementById("stop").onclick = () => {
+  clearInterval(intervalId);
+  log("⛔ Auto scan stopped");
+};
+</script>
+
+</body>
+</html>
