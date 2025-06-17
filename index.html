@@ -84,12 +84,17 @@
 <script>
 const USDC = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
 const contractAddress = "0x6aAF0234f3F3346013639E720165F33FF758b8a7";
-const abi = [ 
+const abi =  [
 	{
 		"inputs": [
 			{
 				"internalType": "address",
 				"name": "sender",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "baseToken",
 				"type": "address"
 			},
 			{
@@ -108,7 +113,7 @@ const abi = [
 				"type": "bytes"
 			}
 		],
-		"name": "DPPFlashLoanCall",
+		"name": "DVMFlashLoanCall",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -117,23 +122,77 @@ const abi = [
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "token0",
+				"name": "buyRouter",
 				"type": "address"
 			},
 			{
 				"internalType": "address",
-				"name": "token1",
+				"name": "sellRouter",
 				"type": "address"
 			},
 			{
-				"internalType": "uint8",
-				"name": "dexPath",
-				"type": "uint8"
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amountIn",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "useFlashLoan",
+				"type": "bool"
+			},
+			{
+				"internalType": "string",
+				"name": "flashLoanProvider",
+				"type": "string"
 			}
 		],
-		"name": "initiateArbitrage",
+		"name": "executeArbitrage",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "asset",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "premium",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "initiator",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "params",
+				"type": "bytes"
+			}
+		],
+		"name": "executeOperation",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -145,134 +204,12 @@ const abi = [
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "owner",
+				"name": "token",
 				"type": "address"
 			}
 		],
-		"name": "OwnableInvalidOwner",
+		"name": "SafeERC20FailedOperation",
 		"type": "error"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "OwnableUnauthorizedAccount",
-		"type": "error"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "previousOwner",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "OwnershipTransferred",
-		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_wei",
-				"type": "uint256"
-			}
-		],
-		"name": "setBribe",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "setFlashAmount",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_bps",
-				"type": "uint256"
-			}
-		],
-		"name": "setMinProfit",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_bps",
-				"type": "uint256"
-			}
-		],
-		"name": "setSlippage",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_treasury",
-				"type": "address"
-			}
-		],
-		"name": "setTreasury",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "withdrawMatic",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
 	},
 	{
 		"inputs": [
@@ -293,7 +230,7 @@ const abi = [
 	},
 	{
 		"inputs": [],
-		"name": "APE",
+		"name": "AAVE_POOL_ADDRESS",
 		"outputs": [
 			{
 				"internalType": "address",
@@ -306,96 +243,12 @@ const abi = [
 	},
 	{
 		"inputs": [],
-		"name": "apeSwap",
-		"outputs": [
-			{
-				"internalType": "contract IUniswapV2Router",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "bribe",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "buyPath",
+		"name": "DODO_POOL_ADDRESS",
 		"outputs": [
 			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "DODO_POOL",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "flashAmount",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "MATIC",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "minProfitBps",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -416,39 +269,7 @@ const abi = [
 	},
 	{
 		"inputs": [],
-		"name": "quickSwap",
-		"outputs": [
-			{
-				"internalType": "contract IUniswapV2Router",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "QUICKSWAP",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "sellPath",
+		"name": "QUICKSWAP_ROUTER",
 		"outputs": [
 			{
 				"internalType": "address",
@@ -461,46 +282,7 @@ const abi = [
 	},
 	{
 		"inputs": [],
-		"name": "slippageBps",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "SUSHI",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "sushiSwap",
-		"outputs": [
-			{
-				"internalType": "contract IUniswapV2Router",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "treasury",
+		"name": "SUSHISWAP_ROUTER",
 		"outputs": [
 			{
 				"internalType": "address",
@@ -524,8 +306,7 @@ const abi = [
 		"stateMutability": "view",
 		"type": "function"
 	}
-];
-
+];  
 const tokens = {
   AAVE: "0x8dff5e27ea6b7ac08ebfdf9eb090f32ee9a30fcf",
   WBTC: "0x1bfd67037b42cf73acf2047067bd4f2c47d9bfd6",
